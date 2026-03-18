@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["three"],
+  turbopack: {},
+  webpack: (config) => {
+    config.externals = [...(config.externals || [])];
+    return config;
+  },
   reactCompiler: true,
 };
 
