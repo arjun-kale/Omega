@@ -8,13 +8,21 @@
  * @module
  */
 
+import type * as defects from "../defects.js";
+import type * as http from "../http.js";
+import type * as telemetry from "../telemetry.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  defects: typeof defects;
+  http: typeof http;
+  telemetry: typeof telemetry;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
