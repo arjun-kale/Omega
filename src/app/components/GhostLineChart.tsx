@@ -57,7 +57,7 @@ export function GhostLineChart() {
     <div
       className={`rounded-xl border p-5 transition-all duration-700 ${
         willOverheat
-          ? "animate-pulse border-red-500/50 bg-red-950/20"
+          ? "animate-pulse-slow border-red-500/50 bg-red-950/20"
           : "border-zinc-800 bg-zinc-900"
       }`}
     >

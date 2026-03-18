@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
@@ -8,6 +9,7 @@ const XRAY_FILTER =
 
 export function XRayCards() {
   const defects = useQuery(api.defects.getAll);
+  const [tinyImageIds, setTinyImageIds] = useState<Record<string, boolean>>({});
 
   if (defects === undefined) {
     return (
@@ -57,13 +59,24 @@ export function XRayCards() {
             </div>
 
             {defect.imageUrl ? (
-              <div className="mb-3 overflow-hidden rounded-lg bg-zinc-950">
+              <div className="relative mb-3 overflow-hidden rounded-lg bg-zinc-950">
                 <img
                   src={defect.imageUrl}
                   alt={`Defect frame ${defect.timeDetected}`}
-                  className="w-full object-cover"
+                  className="h-40 w-full object-cover"
                   style={{ filter: XRAY_FILTER }}
+                  onLoad={(event) => {
+                    const image = event.currentTarget;
+                    if (image.naturalWidth <= 2 || image.naturalHeight <= 2) {
+                      setTinyImageIds((prev) => ({ ...prev, [defect._id]: true }));
+                    }
+                  }}
                 />
+                {tinyImageIds[defect._id] ? (
+                  <div className="absolute inset-x-0 bottom-0 bg-zinc-950/90 px-2 py-1 font-mono text-[10px] text-amber-300">
+                    Tiny test image detected (1x1-like). Send a real camera frame for full X-ray preview.
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="mb-3 flex h-32 items-center justify-center rounded-lg bg-zinc-950">

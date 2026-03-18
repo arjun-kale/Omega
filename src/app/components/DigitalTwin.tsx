@@ -2,8 +2,8 @@
 
 import { useQuery } from "convex/react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
-import { Suspense, useMemo, useRef } from "react";
+import { OrbitControls, useGLTF } from "@react-three/drei";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { api } from "../../../convex/_generated/api";
 
@@ -17,6 +17,31 @@ function getEmissiveIntensity(temp: number): number {
   if (temp > 40) return 2.0;
   if (temp > 35) return 0.8;
   return 0;
+}
+
+function GearModel({ temp }: { temp: number }) {
+  const { scene } = useGLTF("/models/gear.gltf");
+  const color = useMemo(() => getEmissiveColor(temp), [temp]);
+  const intensity = useMemo(() => getEmissiveIntensity(temp), [temp]);
+
+  useMemo(() => {
+    scene.traverse((child) => {
+      if (!(child as THREE.Mesh).isMesh) return;
+      const mesh = child as THREE.Mesh;
+      const materials = Array.isArray(mesh.material)
+        ? mesh.material
+        : [mesh.material];
+
+      materials.forEach((material) => {
+        const stdMat = material as THREE.MeshStandardMaterial;
+        stdMat.emissive = color;
+        stdMat.emissiveIntensity = intensity;
+        stdMat.needsUpdate = true;
+      });
+    });
+  }, [scene, color, intensity]);
+
+  return <primitive object={scene} scale={1.5} />;
 }
 
 function FallbackModel({ temp }: { temp: number }) {
@@ -44,13 +69,13 @@ function FallbackModel({ temp }: { temp: number }) {
   );
 }
 
-function Scene({ temp }: { temp: number }) {
+function Scene({ temp, hasModel }: { temp: number; hasModel: boolean }) {
   return (
     <>
       <ambientLight intensity={0.4} />
       <pointLight position={[5, 5, 5]} intensity={1} />
       <pointLight position={[-5, -5, -5]} intensity={0.3} />
-      <FallbackModel temp={temp} />
+      {hasModel ? <GearModel temp={temp} /> : <FallbackModel temp={temp} />}
       <OrbitControls
         enableZoom={false}
         enablePan={false}
@@ -63,6 +88,27 @@ function Scene({ temp }: { temp: number }) {
 
 export function DigitalTwin() {
   const latest = useQuery(api.telemetry.getLatest);
+  const [hasModel, setHasModel] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    void fetch("/models/gear.gltf", { method: "HEAD" })
+      .then((response) => {
+        if (active) {
+          setHasModel(response.ok);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setHasModel(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (latest === undefined) {
     return (
@@ -99,7 +145,7 @@ export function DigitalTwin() {
       <div className="h-56 overflow-hidden rounded-lg bg-zinc-950">
         <Canvas camera={{ position: [0, 0, 3], fov: 50 }}>
           <Suspense fallback={null}>
-            <Scene temp={temp} />
+            <Scene temp={temp} hasModel={hasModel} />
           </Suspense>
         </Canvas>
       </div>
