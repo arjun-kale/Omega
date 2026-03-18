@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -60,11 +61,13 @@ export function XRayCards() {
 
             {defect.imageUrl ? (
               <div className="relative mb-3 overflow-hidden rounded-lg bg-zinc-950">
-                <img
+                <Image
                   src={defect.imageUrl}
                   alt={`Defect frame ${defect.timeDetected}`}
-                  className="h-40 w-full object-cover"
+                  fill
+                  className="object-cover"
                   style={{ filter: XRAY_FILTER }}
+                  unoptimized
                   onLoad={(event) => {
                     const image = event.currentTarget;
                     if (image.naturalWidth <= 2 || image.naturalHeight <= 2) {

@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate:gear": "tsx scripts/generate-gear.ts",
+    "bridge:esp32": "tsx scripts/esp32-bridge.ts",
+    "ingest:start": "tsx scripts/start-ingest.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -28,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.7",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
