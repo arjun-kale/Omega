@@ -6,12 +6,22 @@ export const insertReading = mutation({
     temp: v.number(),
     status: v.string(),
     timestamp: v.number(),
+    minTemp: v.optional(v.number()),
+    maxTemp: v.optional(v.number()),
+    avgTemp: v.optional(v.number()),
+    ambientTemp: v.optional(v.number()),
+    grid: v.optional(v.array(v.array(v.number()))),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("telemetry", {
       temp: args.temp,
       status: args.status,
       timestamp: args.timestamp,
+      minTemp: args.minTemp,
+      maxTemp: args.maxTemp,
+      avgTemp: args.avgTemp,
+      ambientTemp: args.ambientTemp,
+      grid: args.grid,
     });
 
     const all = await ctx.db.query("telemetry").order("desc").collect();

@@ -6,6 +6,11 @@ export default defineSchema({
     temp: v.number(),
     status: v.string(),
     timestamp: v.number(),
+    minTemp: v.optional(v.number()),
+    maxTemp: v.optional(v.number()),
+    avgTemp: v.optional(v.number()),
+    ambientTemp: v.optional(v.number()),
+    grid: v.optional(v.array(v.array(v.number()))),
   }),
 
   defects: defineTable({

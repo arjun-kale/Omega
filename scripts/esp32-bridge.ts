@@ -103,6 +103,24 @@ function parseCelsius(text: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseJsonLenient(raw: string): unknown | null {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    // Some firmware emits non-standard JSON tokens (e.g. avgTemp:nan).
+    const normalized = raw
+      .replace(/:\s*nan\b/gi, ":null")
+      .replace(/:\s*\+?inf(inity)?\b/gi, ":null")
+      .replace(/:\s*-inf(inity)?\b/gi, ":null");
+
+    try {
+      return JSON.parse(normalized) as unknown;
+    } catch {
+      return null;
+    }
+  }
+}
+
 function extractTemperatureFromThermalHtml(html: string): number | null {
   const statMatches = [
     ...html.matchAll(
@@ -145,7 +163,13 @@ function extractTemperatureFromThermalHtml(html: string): number | null {
   return null;
 }
 
-async function readThermal(): Promise<number | null> {
+async function readThermal(): Promise<{
+  temp: number;
+  minTemp?: number;
+  maxTemp?: number;
+  avgTemp?: number;
+  ambientTemp?: number;
+} | null> {
   let contentType = "";
   let raw = "";
 
@@ -161,12 +185,24 @@ async function readThermal(): Promise<number | null> {
 
     contentType = response.headers.get("content-type") ?? "";
 
-    if (contentType.includes("application/json")) {
-      const json = (await response.json()) as unknown;
-      return extractTemperature(json);
-    }
-
     raw = (await response.text()).trim();
+
+    if (contentType.includes("application/json")) {
+      const json = parseJsonLenient(raw);
+      if (json !== null && typeof json === "object") {
+        const obj = json as Record<string, unknown>;
+        const temp = extractTemperature(obj);
+        if (temp !== null) {
+          return {
+            temp,
+            minTemp: typeof obj.minTemp === "number" ? obj.minTemp : undefined,
+            maxTemp: typeof obj.maxTemp === "number" ? obj.maxTemp : undefined,
+            avgTemp: typeof obj.avgTemp === "number" && Number.isFinite(obj.avgTemp) ? obj.avgTemp : undefined,
+            ambientTemp: typeof obj.ambientTemp === "number" ? obj.ambientTemp : undefined,
+          };
+        }
+      }
+    }
   } catch (fetchError) {
     // Fallback to curl because it can return partial payloads even on timeout.
     try {
@@ -198,22 +234,27 @@ async function readThermal(): Promise<number | null> {
   if (contentType.includes("text/html") || raw.startsWith("<!DOCTYPE html")) {
     const fromHtml = extractTemperatureFromThermalHtml(raw);
     if (fromHtml !== null) {
-      return fromHtml;
+      return { temp: fromHtml };
     }
   }
 
-  try {
-    const maybeJson = JSON.parse(raw) as unknown;
-    const parsed = extractTemperature(maybeJson);
+  const maybeJson = parseJsonLenient(raw);
+  if (maybeJson !== null && typeof maybeJson === "object") {
+    const obj = maybeJson as Record<string, unknown>;
+    const parsed = extractTemperature(obj);
     if (parsed !== null) {
-      return parsed;
+      return {
+        temp: parsed,
+        minTemp: typeof obj.minTemp === "number" ? obj.minTemp : undefined,
+        maxTemp: typeof obj.maxTemp === "number" ? obj.maxTemp : undefined,
+        avgTemp: typeof obj.avgTemp === "number" && Number.isFinite(obj.avgTemp) ? obj.avgTemp : undefined,
+        ambientTemp: typeof obj.ambientTemp === "number" ? obj.ambientTemp : undefined,
+      };
     }
-  } catch {
-    // Not JSON, continue as plain value.
   }
 
   const asNumber = Number.parseFloat(raw);
-  return Number.isFinite(asNumber) ? asNumber : null;
+  return Number.isFinite(asNumber) ? { temp: asNumber } : null;
 }
 
 async function captureImageBase64(): Promise<string | null> {
@@ -235,11 +276,23 @@ async function captureImageBase64(): Promise<string | null> {
   return buffer.toString("base64");
 }
 
-async function postToConvex(temp: number, status: "OK" | "NOK", imageBase64?: string): Promise<void> {
+async function postToConvex(
+  temp: number,
+  status: "OK" | "NOK",
+  imageBase64?: string,
+  minTemp?: number,
+  maxTemp?: number,
+  avgTemp?: number,
+  ambientTemp?: number,
+): Promise<void> {
   const payload: {
     temp: number;
     status: "OK" | "NOK";
     imageBase64?: string;
+    minTemp?: number;
+    maxTemp?: number;
+    avgTemp?: number;
+    ambientTemp?: number;
   } = {
     temp,
     status,
@@ -247,6 +300,18 @@ async function postToConvex(temp: number, status: "OK" | "NOK", imageBase64?: st
 
   if (imageBase64) {
     payload.imageBase64 = imageBase64;
+  }
+  if (minTemp !== undefined) {
+    payload.minTemp = minTemp;
+  }
+  if (maxTemp !== undefined) {
+    payload.maxTemp = maxTemp;
+  }
+  if (avgTemp !== undefined) {
+    payload.avgTemp = avgTemp;
+  }
+  if (ambientTemp !== undefined) {
+    payload.ambientTemp = ambientTemp;
   }
 
   const response = await fetch(INGEST_URL, {
@@ -266,13 +331,13 @@ async function postToConvex(temp: number, status: "OK" | "NOK", imageBase64?: st
 }
 
 async function tick(): Promise<void> {
-  const temp = await readThermal();
+  const thermalData = await readThermal();
 
-  if (temp === null) {
+  if (thermalData === null || thermalData.temp === null) {
     throw new Error("Could not parse temperature from thermal response");
   }
 
-  const status: "OK" | "NOK" = temp >= NOK_THRESHOLD ? "NOK" : "OK";
+  const status: "OK" | "NOK" = thermalData.temp >= NOK_THRESHOLD ? "NOK" : "OK";
   let imageBase64: string | undefined;
 
   if (status === "NOK") {
@@ -283,9 +348,17 @@ async function tick(): Promise<void> {
     }
   }
 
-  await postToConvex(temp, status, imageBase64);
+  await postToConvex(
+    thermalData.temp,
+    status,
+    imageBase64,
+    thermalData.minTemp,
+    thermalData.maxTemp,
+    thermalData.avgTemp,
+    thermalData.ambientTemp,
+  );
   console.log(
-    `[bridge] posted temp=${temp.toFixed(2)} status=${status}${imageBase64 ? " +image" : ""}`,
+    `[bridge] posted temp=${thermalData.temp.toFixed(2)} status=${status}${imageBase64 ? " +image" : ""}`,
   );
 }
 

@@ -8,6 +8,11 @@ type IngestBody = {
   temp: unknown;
   status: unknown;
   imageBase64?: unknown;
+  minTemp?: unknown;
+  maxTemp?: unknown;
+  avgTemp?: unknown;
+  ambientTemp?: unknown;
+  grid?: unknown;
 };
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
@@ -50,10 +55,26 @@ http.route({
 
     const serverTimestamp = Date.now();
 
+    const minTempVal = typeof body.minTemp === "number" ? body.minTemp : undefined;
+    const maxTempVal = typeof body.maxTemp === "number" ? body.maxTemp : undefined;
+    const avgTempVal = typeof body.avgTemp === "number" ? body.avgTemp : undefined;
+    const ambientTempVal =
+      typeof body.ambientTemp === "number" ? body.ambientTemp : undefined;
+    const gridVal =
+      Array.isArray(body.grid) &&
+      body.grid.every((row) => Array.isArray(row) && row.every((v) => typeof v === "number"))
+        ? (body.grid as number[][])
+        : undefined;
+
     await ctx.runMutation(api.telemetry.insertReading, {
       temp: body.temp,
       status: body.status,
       timestamp: serverTimestamp,
+      minTemp: minTempVal,
+      maxTemp: maxTempVal,
+      avgTemp: avgTempVal,
+      ambientTemp: ambientTempVal,
+      grid: gridVal,
     });
 
     if (
