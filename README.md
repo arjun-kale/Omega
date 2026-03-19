@@ -371,11 +371,5 @@ Industrial IoT Monitoring · Hackathon Project · March 2026
 
 ---
 
-## 📄 License
-
-MIT License — Feel free to fork, modify, and deploy.
-
----
-
 **Built with ❤️ by Team Omega**  
 *Turning sensor chaos into thermal clarity.*
