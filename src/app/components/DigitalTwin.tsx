@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { api } from "../../../convex/_generated/api";
 
 function getTempColor(temp: number, minTemp: number, maxTemp: number): string {
@@ -18,15 +18,30 @@ function getTempColor(temp: number, minTemp: number, maxTemp: number): string {
 
 function HeatmapGrid({ minTemp, maxTemp }: { minTemp: number; maxTemp: number }) {
   const GRID_SIZE = 12;
+  const [time, setTime] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime((t) => t + 0.016);
+    }, 16);
+    return () => clearInterval(interval);
+  }, []);
+
   const cells = useMemo(() => {
     const arr: number[] = [];
     for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
-      const baseTemp = minTemp + ((maxTemp - minTemp) * (i % GRID_SIZE)) / GRID_SIZE;
-      const variance = Math.sin(i * 0.137) * (maxTemp - minTemp) * 0.15;
-      arr.push(baseTemp + variance);
+      const row = Math.floor(i / GRID_SIZE);
+      const col = i % GRID_SIZE;
+
+      const baseTemp = minTemp + ((maxTemp - minTemp) * col) / GRID_SIZE;
+      const heightVariance = Math.sin(row * 0.4 + time * 1.2) * (maxTemp - minTemp) * 0.1;
+      const waveVariance = Math.cos(col * 0.3 + time * 0.8) * (maxTemp - minTemp) * 0.08;
+      const pulseVariance = Math.sin((row + col) * 0.2 + time * 1.5) * (maxTemp - minTemp) * 0.06;
+
+      arr.push(baseTemp + heightVariance + waveVariance + pulseVariance);
     }
     return arr;
-  }, [minTemp, maxTemp]);
+  }, [minTemp, maxTemp, time]);
 
   return (
     <div className="flex h-56 flex-col gap-0.5 rounded-lg bg-zinc-950 p-2">
