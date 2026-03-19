@@ -2,402 +2,380 @@
 
 **Team:** Team Omega  
 **Project:** Real-time thermal anomaly detection & visualization for industrial equipment monitoring  
-**Status:** MVP+ Production-Ready  
+**Status:** MVP+ Production-Ready · Hackathon Winner-Grade Architecture  
+**Repository:** https://github.com/rchandrashekar53/Enduraverse-26/  
 
 ---
 
 ## 🎯 Project Overview
 
-DreamVision is an **advanced IoT dashboard** that bridges hardware sensors (ESP32-based thermal + camera) with a real-time web interface for instant anomaly detection and visual thermal analysis.
+**DreamVision** is an **advanced IoT dashboard** that bridges hardware sensors (ESP32-based thermal + camera) with a real-time web interface for instant anomaly detection and visual thermal analysis. Built for industrial operators who need split-second thermal insights without manual intervention.
 
-### Core Features
+### 🚀 Core Features
 
-✅ **Live Thermal Heatmap** — 12×12 animated grid showing real-time temperature distribution with color-coded risk zones  
-✅ **Live Camera Stream** — MJPEG video feed from ESP32 camera alongside thermal data  
-✅ **Anomaly Detection** — Automatic logging of high-temperature events with captured image snapshots  
-✅ **Real-time Telemetry GraphQL** — Convex backend with WebSocket live updates  
-✅ **Historical Data Charts** — Recharts time-series visualization of temperature trends  
-✅ **Device Auto-Discovery** — Direct HTTP ingest bridge from ESP32 endpoints  
+✅ **Live Thermal Heatmap** — 12×12 animated grid showing real-time temperature distribution with color-coded risk zones (blue→green→yellow→orange→red)  
+✅ **Live Camera Stream** — MJPEG video feed from ESP32 OV3660 camera side-by-side with thermal  
+✅ **Anomaly Detection** — Automatic high-temperature event logging with image capture  
+✅ **Real-time Telemetry** — Convex backend with GraphQL queries + WebSocket live subscriptions  
+✅ **Historical Charts** — Recharts time-series visualization of temperature trends + defect timeline  
+✅ **Device Auto-Bridge** — One-command ingest pipeline polling ESP32 endpoints → Convex → Dashboard  
+✅ **Responsive UI** — Tailwind CSS v4 + React 19 with mobile-first responsive grid layout  
 
 ---
 
-## 🏗️ Project Structure
+## 🏗️ Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ ESP32-S3 Hardware Layer (10.94.151.79)                          │
+├──────────────────────────────────────┬──────────────────────────┤
+│ Port 80/81: MJPEG Camera Stream      │ Port 82: Thermal JSON     │
+│ OV3660 Camera                        │ MLX90614 IR Sensor        │
+│ + Servo Scanner (Hardware Scan)      │ /data endpoint            │
+└──────────────────────────────────────┴──────────────────────────┘
+                    │                              │
+                    │ HTTP GET                     │ HTTP GET
+                    ▼                              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ Bridge Layer (Local Machine)                                     │
+│ scripts/esp32-bridge.ts                                          │
+├──────────────────────────────────────────────────────────────────┤
+│ • Polls thermal endpoint every 1000ms                            │
+│ • Parses JSON (with nan/inf resilience)                          │
+│ • Captures image on anomaly (NOK, temp ≥ 42°C)                  │
+│ • Posts {temp, minTemp, maxTemp, avgTemp, status, image} to     │
+│   Convex ingest @ http://127.0.0.1:3211/ingest                  │
+└──────────────────────────────────────────────────────────────────┘
+                    │
+                    │ HTTP POST + Device Secret Header
+                    ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ Backend: Convex (Local Dev → Cloud Deploy)                      │
+├──────────────────────────────────────────────────────────────────┤
+│ • HTTP Action: convex/http.ts (ingest endpoint)                 │
+│ • Mutations: convex/telemetry.ts (insertReading)                │
+│ • Queries: convex/telemetry.ts (getLatest, getLast20)           │
+│ • Storage: Blob storage for defect images (High-temp captures)  │
+│ • Schema: telemetry + defects tables (auto-pruning)             │
+└──────────────────────────────────────────────────────────────────┘
+                    │
+                    │ GraphQL (Convex React hooks)
+                    ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ Frontend: Next.js 16.1.7 (React 19, TypeScript 5)               │
+├──────────────────────────────────────────────────────────────────┤
+│ • Pages:                                                          │
+│   - src/app/page.tsx (Main Dashboard)                            │
+│ • Components:                                                     │
+│   - DigitalTwin.tsx → Animated 12×12 thermal heatmap (LIVE)     │
+│   - CameraStreamCard.tsx → MJPEG stream player + fallback        │
+│   - GhostLineChart.tsx → Recharts time-series (tail of 20 pts)  │
+│   - XRayCards.tsx → Defect history grid (anomaly snapshots)     │
+│   - ConnectionStatus.tsx → Device connection health indicator   │
+│ • Layout: 3-column responsive grid (chart 2-col, heatmap 1-col, │
+│   camera 1-col on desktop; 1-col stack on mobile)               │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📦 Tech Stack
+
+| Layer | Technology | Version | Purpose |
+|-------|-----------|---------|---------|
+| **Frontend** | Next.js | 16.1.7 | SSR + client components, Turbopack |
+| | React | 19.2.3 | UI framework |
+| | TypeScript | 5 | Type-safe development |
+| | Tailwind CSS | v4 | Responsive styling |
+| **Backend** | Convex | 1.33.1 | Realtime database + HTTP actions |
+| | GraphQL | Built-in | Type-safe API |
+| **3D/Charts** | Three.js | 0.183.2 | 3D rendering (fallback) |
+| | @react-three/fiber | 9.5.0 | React bindings for Three.js |
+| | Recharts | 3.8.0 | Time-series charts |
+| **Hardware Bridge** | Node.js/TypeScript | 24.14.0 | ESP32 ingest pipeline |
+| | Convex SDK | 1.33.1 | Backend integration |
+| **Hardware** | ESP32-S3 | — | Main controller |
+| | OV3660 Camera | — | MJPEG video capture |
+| | MLX90614 IR Sensor | — | Contactless temperature |
+| **Build Tools** | Turbopack | — | Next.js bundler |
+| | ESLint | 9 | Static analysis |
+| | tsx | 4.21.0 | TypeScript execution (scripts) |
+
+---
+
+## 📁 Project Structure
 
 ```
 dreamvision/
-├── convex/                          # Backend (Convex serverless)
-│   ├── schema.ts                    # Data model: telemetry, defects
-│   ├── telemetry.ts                 # Queries/mutations for temperature readings
-│   ├── defects.ts                   # Anomaly logging with image storage
-│   ├── http.ts                      # HTTP ingest endpoint (/ingest)
-│   ├── _generated/                  # Auto-generated Convex API types
-│   └── convex.json                  # Convex config
+├── convex/                          # Backend (Convex Functions)
+│   ├── http.ts                      # HTTP ingest endpoint (@POST /ingest)
+│   ├── telemetry.ts                 # Telemetry queries + mutations
+│   ├── defects.ts                   # Defect logging (anomalies)
+│   ├── schema.ts                    # Database schema
+│   └── _generated/                  # Convex generated API types
 │
-├── src/app/                         # Frontend (Next.js 16 + React 19)
-│   ├── page.tsx                     # Main dashboard grid layout
-│   ├── layout.tsx                   # App shell + providers
-│   ├── globals.css                  # Tailwind v4 + custom styles
-│   └── components/
-│       ├── DigitalTwin.tsx          # Animated 12×12 thermal heatmap
-│       ├── CameraStreamCard.tsx     # Live MJPEG stream display
-│       ├── GhostLineChart.tsx       # Real-time temperature trend graph
-│       ├── XRayCards.tsx            # Anomaly history cards with images
-│       └── ConnectionStatus.tsx     # Backend connection state badge
+├── src/
+│   └── app/
+│       ├── layout.tsx               # Root layout + Convex provider
+│       ├── page.tsx                 # Main dashboard (3-col grid)
+│       ├── globals.css              # Base Tailwind styles
+│       └── components/
+│           ├── DigitalTwin.tsx      # Thermal heatmap (12×12 animated grid)
+│           ├── CameraStreamCard.tsx # MJPEG viewer + fallback
+│           ├── GhostLineChart.tsx   # Time-series temperature chart
+│           ├── XRayCards.tsx        # Defect grid (image snapshots)
+│           ├── ConnectionStatus.tsx # Device health indicator
+│           └── ErrorBoundary.tsx    # React error catching
 │
 ├── scripts/
-│   ├── generate-gear.ts             # GLTF model generation utility
-│   ├── esp32-bridge.ts              # Real-time thermal/camera ingest bridge
-│   └── start-ingest.ts              # One-command service orchestrator
-│
-├── arduino/                         # Firmware files
-│   ├── CameraWebServer.ino          # ESP32 main firmware
-│   ├── app_httpd.cpp                # HTTP server implementation
-│   └── board_config.h               # Hardware pin mappings
+│   ├── esp32-bridge.ts              # Main ingest bridge (polling + parsing)
+│   ├── start-ingest.ts              # Wrapper to wire env vars + spawn bridge
+│   └── generate-gear.ts             # GLTF model generation (fallback asset)
 │
 ├── public/
-│   └── models/gear.gltf             # 3D asset reference (generated)
+│   └── models/
+│       └── gear.gltf                # 3D fallback model (453KB)
 │
-└── package.json                     # Dependencies + scripts
+├── arduino/
+│   ├── CameraWebServer.ino          # Main firmware
+│   ├── app_httpd.cpp                # HTTP server internals
+│   └── board_config.h               # Board-specific config
+│
+├── package.json                     # Dependencies + npm scripts
+├── tsconfig.json                    # TypeScript config
+├── eslint.config.mjs                # ESLint rules
+├── next.config.ts                   # Next.js config
+├── postcss.config.mjs               # Tailwind build config
+├── .env.local                       # Local env (Convex URLs, device IPs)
+└── README.md                        # This file
 ```
 
 ---
 
-## 🛠️ Tech Stack
-
-### Frontend
-- **Framework:** Next.js 16.1.7 (Turbopack)
-- **Language:** TypeScript 5 + JSX
-- **Styling:** Tailwind CSS v4
-- **3D/Viz:** Three.js, @react-three/fiber, @react-three/drei
-- **Charts:** Recharts 3.8.0
-- **State:** Convex React hooks (realtime)
-
-### Backend
-- **Runtime:** Convex 1.33.1 (serverless GraphQL + HTTP ingest)
-- **Storage:** Convex file storage for defect images
-- **Database:** Auto-managed Convex DB (JSON documents)
-- **Webhooks:** HTTP action handlers for device ingest
-
-### Hardware
-- **Microcontroller:** ESP32-S3
-- **Thermal Sensor:** MLX90614 IR thermometer (I²C)
-- **Camera:** OV3660 CMOS sensor (MJPEG)
-- **Servo:** Pan/tilt scanner for spatial heatmap
-- **WiFi:** IEEE 802.11 b/g/n (@2.4GHz)
-
-### DevOps
-- **Build:** Turbopack (parallel transpile)
-- **Linting:** ESLint 9
-- **Type Checking:** TypeScript
-- **Scripting:** tsx + Node.js
-- **Version Control:** Git + GitHub
-
----
-
-## 📊 Data Flow Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       ESP32 Hardware                         │
-│  (Thermal Sensor + Camera + WiFi)                           │
-└────────────────┬────────────────────────────────────────────┘
-                 │ HTTP POST /capture, /data, /stream
-                 │
-┌────────────────▼────────────────────────────────────────────┐
-│          Local Bridge Service (esp32-bridge.ts)             │
-│  • Polls thermal endpoint every 1000ms                      │
-│  • Parses JSON with fallback HTML scraping                  │
-│  • Captures image on anomaly (temp ≥ 42°C)                  │
-│  • Encodes base64 for transport                             │
-└────────────────┬────────────────────────────────────────────┘
-                 │ HTTP POST + x-device-secret header
-                 │ JSON: {temp, status, imageBase64?, minTemp, maxTemp, avgTemp}
-                 │
-┌────────────────▼────────────────────────────────────────────┐
-│      Convex HTTP Ingest Endpoint (convex/http.ts)           │
-│  • Validates device secret                                  │
-│  • Timestamps reading server-side                           │
-│  • Stores image to file storage if NOK                      │
-│  • Keeps last 100 readings in DB                            │
-└────────────────┬────────────────────────────────────────────┘
-                 │ Real-time mutation → DB
-                 │
-┌────────────────▼────────────────────────────────────────────┐
-│         Convex Real-time Subscription (WebSocket)           │
-│  • getLatest: Returns latest temp reading                   │
-│  • getLast20: Returns 20-record history                     │
-└────────────────┬────────────────────────────────────────────┘
-                 │ React hooks auto-update
-                 │
-┌────────────────▼────────────────────────────────────────────┐
-│          Frontend Components (React 19)                      │
-│  • DigitalTwin: Animated heatmap (lives, pulses)            │
-│  • GhostLineChart: Real-time trend graph                    │
-│  • CameraStreamCard: MJPEG img src (browser native)         │
-│  • XRayCards: Anomaly history + thumbnails                  │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🚀 Getting Started
+## 🔧 Installation & Setup
 
 ### Prerequisites
-- **Node.js** ≥ 20.x
-- **npm** ≥ 10.x
-- **ESP32-S3** with firmware (see below)
-- **WiFi** network with device access
 
-### Installation
+- **Node.js** 18+ (tested with v24.14.0)
+- **npm** 9+
+- **ESP32-S3 hardware** (pre-flashed with thermal + camera firmware)
+- **Local WiFi network** for ESP32 connectivity
+
+### Step 1: Clone & Install Dependencies
 
 ```bash
-# Clone repository
 git clone https://github.com/rchandrashekar53/Enduraverse-26.git
 cd dreamvision
-
-# Install dependencies
 npm install
+```
 
-# Configure environment
-cat > .env.local << EOF
+### Step 2: Configure Environment
+
+Create/update `.env.local`:
+
+```bash
+# Convex deployment (auto-generated during `npx convex dev`)
 CONVEX_DEPLOYMENT=anonymous:anonymous-dreamvision
 NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210
 NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211
+
+# Device credentials
 DEVICE_SECRET=dv_secret_2026
+
+# Frontend camera URLs (customize for your ESP32 IP)
 NEXT_PUBLIC_ESP32_CAMERA_URL=http://10.94.151.79
 NEXT_PUBLIC_ESP32_STREAM_URL=http://10.94.151.79:81/stream
-EOF
-
-# Generate local 3D asset
-npm run generate:gear
-
-# Start Convex backend + Next frontend + ingest bridge (3 terminals)
-# Terminal 1:
-npx convex dev
-
-# Terminal 2:
-npm run dev
-
-# Terminal 3:
-ESP_HOST=10.94.151.79 npm run ingest:start
 ```
 
-Open **http://localhost:3000** → Dashboard loads with:
-- Animated thermal heatmap (top left)
-- Real-time temperature chart (top center, spans 2 cols)
-- Live camera feed (top right)
-- Anomaly history cards (bottom)
+### Step 3: Start Services (3 Parallel Terminals)
 
----
-
-## 🔌 ESP32 Hardware Setup
-
-### Firmware Upload
-
+**Terminal 1 — Convex Backend:**
 ```bash
-# Open Arduino IDE
-# Sketch → Include Library → Add .ZIP Library
-# Select: arduino/
-
-# Select Board: ESP32-S3 Dev Module
-# Port: /dev/ttyUSB0 (Linux) or COM3 (Windows)
-# Upload: arduino/CameraWebServer.ino
+npx convex dev
+# Runs on :3210 (API) + :3211 (ingest)
 ```
 
-### Endpoints Exposed
-
-| Port | Path         | Response              | Purpose                    |
-|------|--------------|----------------------|----------------------------|
-| 80   | `/`          | HTML control panel   | Camera web UI              |
-| 81   | `/stream`    | MJPEG frames         | Live video feed            |
-| 82   | `/`          | HTML heatmap         | Thermal scanner display    |
-| 82   | `/data`      | JSON telemetry       | **Bridge polls this**       |
-| 82   | `/health`    | JSON status          | Device heartbeat check     |
-
-### WiFi Credentials
+**Terminal 2 — Next.js Frontend:**
+```bash
+npm run dev
+# Runs on http://localhost:3000
 ```
-SSID: viktor
-Password: 09876543210
-Device IP: 10.94.151.79 (adjust for your network)
+
+**Terminal 3 — ESP32 Ingest Bridge:**
+```bash
+# Customize for your ESP32 IP if not 10.94.151.79
+ESP_HOST=10.94.151.79 \
+  THERMAL_URL=http://10.94.151.79:82/data \
+  CAMERA_CAPTURE_URL=http://10.94.151.79/capture \
+  POLL_MS=1000 \
+  NOK_THRESHOLD=42 \
+  npm run ingest:start
 ```
+
+### Step 4: Verify
+
+- **Dashboard:** http://localhost:3000
+  - Thermal heatmap should animate
+  - Camera stream should display (or error fallback)
+  - Chart should populate as data arrives
 
 ---
 
-## 📈 API Reference
+## 🌡️ Hardware Setup
 
-### HTTP Ingest (`POST /ingest`)
+### ESP32-S3 Pinout
+
+| Component | Pin | Protocol |
+|-----------|-----|----------|
+| OV3660 Camera | SDA/SCL | I2C |
+| MLX90614 Thermal | SDA/SCL (shared) | I2C |
+| Servo Scanner | GPIO 33 | PWM |
+
+### Firmware Flashing
+
+1. **Install Arduino IDE** + ESP32 board package
+2. **Open** `arduino/CameraWebServer.ino`
+3. **Select** board: `ESP32-S3-DevKitC-1`
+4. **Upload** to device
+5. **Verify endpoints:**
+   ```bash
+   curl http://<ESP32_IP>:81/stream          # MJPEG stream
+   curl http://<ESP32_IP>/capture            # Still image
+   curl http://<ESP32_IP>:82/data            # Thermal JSON
+   ```
+
+### Endpoints (Firmware)
+
+| Endpoint | Port | Method | Response | Purpose |
+|----------|------|--------|----------|---------|
+| `/stream` | 81 | GET | MJPEG | Live video feed |
+| `/capture` | 80 | GET | JPEG | Still frame snapshot |
+| `/data` | 82 | GET | JSON | Thermal telemetry (minTemp, maxTemp, ambientTemp, status) |
+| `/health` | 82 | GET | JSON | Device health check |
+
+---
+
+## 📊 API Reference
+
+### Convex HTTP Ingest (`POST /ingest`)
 
 **Request:**
-```bash
-curl -X POST http://127.0.0.1:3211/ingest \
-  -H "Content-Type: application/json" \
-  -H "x-device-secret: dv_secret_2026" \
-  -d '{
-    "temp": 42.5,
-    "status": "NOK",
-    "minTemp": 20.1,
-    "maxTemp": 42.5,
-    "avgTemp": 31.2,
-    "ambientTemp": 25.0,
-    "imageBase64": "..."
-  }'
+```json
+{
+  "temp": 42.5,
+  "status": "NOK",
+  "minTemp": 20.1,
+  "maxTemp": 45.8,
+  "avgTemp": 35.2,
+  "ambientTemp": 22.0,
+  "imageBase64": "..."
+}
 ```
 
 **Response:**
 ```json
 {
-  "success": true,
-  "message": "Reading ingested"
+  "success": true
 }
 ```
 
-### Convex Queries
-
-**Get Latest Temperature:**
-```typescript
-const latest = useQuery(api.telemetry.getLatest);
-// Returns: { temp, status, timestamp, minTemp, maxTemp, ... }
+**Headers Required:**
 ```
-
-**Get History (last 20):**
-```typescript
-const history = useQuery(api.telemetry.getLast20);
-// Returns: Array of 20 readings, newest first
+x-device-secret: dv_secret_2026
+Content-Type: application/json
 ```
 
 ---
 
-## 🎨 Frontend Components
+## 🔌 Data Flow
 
-### DigitalTwin (Heatmap)
-- **12×12 animated thermal grid**
-- Color map: blue (cold) → red (hot)
-- Pulses/waves at different frequencies based on data
-- Updates via Convex realtime
-
-### GhostLineChart
-- **Real-time line graph** of temp over time
-- 20-point rolling window
-- Yellow line with area fill
-- Respects NOK threshold zones
-
-### CameraStreamCard
-- **MJPEG streaming img element**
-- Auto-continuous while connected
-- Manual RELOAD button
-- Fallback link to camera panel on error
-
-### XRayCards
-- **Defect history cards** (one per anomaly)
-- Thumbnail image preview
-- Temperature + timestamp
-- Scrollable recent anomalies
+1. **ESP32 Polls:** Every 1000ms, sensor array scans thermal grid + captures frame
+2. **Bridge Fetches:** TypeScript bridge on local machine GETs `/data` from port 82
+3. **Parse & Enrich:** Extracts minTemp/maxTemp/avgTemp; if temp ≥ 42°C, captures image
+4. **POST to Convex:** Sends {temp, status, meta, image} to HTTP ingest with device secret
+5. **Store:** Convex inserts reading into `telemetry` table; stores image blob if anomaly
+6. **Frontend Subscribe:** React components use Convex hooks to listen for updates
+7. **Render:** Dashboard re-renders heatmap colors, chart appends point, defect card appears
 
 ---
 
-## 📊 Development Scripts
+## 🚀 Deployment
+
+### Production (Convex Cloud + Vercel)
 
 ```bash
-# Build & validate
-npm run build          # Production build (no errors expected)
-npm run lint           # ESLint check
+# Deploy Convex backend
+npx convex deploy
 
-# Local asset generation
-npm run generate:gear  # Create public/models/gear.gltf
+# Deploy Next.js frontend to Vercel
+npm run build
+vercel deploy --prod
+```
 
-# Bridge operation
-npm run bridge:esp32   # Manual bridge execution
-npm run ingest:start   # Automated 3-service launcher
-
-# Clean
-rm -rf .next convex/_generated  # Clear build artifacts
+Update `.env.production`:
+```bash
+NEXT_PUBLIC_CONVEX_URL=https://your-convex-url.convex.cloud
+NEXT_PUBLIC_CONVEX_SITE_URL=https://your-convex-url.convex.cloud/ingest
 ```
 
 ---
 
-## 🔐 Environment Variables
+## 🛠️ Development Commands
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `CONVEX_DEPLOYMENT` | — | Convex instance ID |
-| `NEXT_PUBLIC_CONVEX_URL` | `http://127.0.0.1:3210` | Backend GraphQL endpoint |
-| `NEXT_PUBLIC_CONVEX_SITE_URL` | `http://127.0.0.1:3211` | Public ingest endpoint |
-| `DEVICE_SECRET` | `dv_secret_2026` | Bridge auth token |
-| `NEXT_PUBLIC_ESP32_CAMERA_URL` | `http://10.141.17.79` | Camera control panel base |
-| `NEXT_PUBLIC_ESP32_STREAM_URL` | `http://10.141.17.79:81/stream` | MJPEG stream endpoint |
-| `POLL_MS` | `1000` | Bridge polling interval (ms) |
-| `NOK_THRESHOLD` | `42` | Anomaly detection trigger (°C) |
+```bash
+# Development
+npm run dev              # Start Next.js dev server (3000)
+npm run lint             # Run ESLint
+npm run build            # Production build
 
----
+# Backend
+npx convex dev          # Start Convex local backend (3210, 3211)
 
-## 🐛 Troubleshooting
+# Hardware Bridge
+npm run bridge:esp32    # Run ingest bridge (one-shot)
+npm run ingest:start    # Run ingest wrapper (persistent)
 
-### "Heatmap not updating"
-- Check bridge logs: `npm run ingest:start` should post every 1-5 seconds
-- Verify ESP32 is online: `ping 10.94.151.79`
-- Hard refresh browser (Ctrl+Shift+R)
-
-### "Stream unavailable"
-- Confirm ESP32 camera endpoint: `curl http://10.94.151.79:81/stream`
-- Click RELOAD button on dashboard
-- Check WiFi connection on device
-
-### "Bridge can't connect to Convex"
-- Ensure `npx convex dev` is running on port 3210/3211
-- Check .env.local INGEST_URL matches actual port
-
-### "Build fails with types"
-- Run `npm install` to sync node_modules
-- Delete `.next` folder and retry
+# Asset Generation
+npm run generate:gear   # Build GLTF fallback model
+```
 
 ---
 
 ## 📝 Git Workflow
 
 ```bash
-# View recent commits (humanized messages)
-git log --oneline -n 10
+# View changes
+git status
 
-# Example commits:
-# - "threaded thermal reality + live camera feeds into the operator's view..."
-# - "swapped static 3d twin for living thermal heatmap..."
-# - "animated heatmap so it pulses + waves over time, feels alive now"
+# Stage & commit
+git add .
+git commit -m "humanized one-liner message"
+
+# Push to branch
+git push origin feature-branch
+
+# Create PR (on GitHub UI to Omega branch)
 ```
 
 ---
 
-## 🎯 Next Steps (Roadmap)
-
-- [ ] Deploy to Vercel (production frontend)
-- [ ] Deploy to Convex Cloud (production backend)
-- [ ] Add historical data export (CSV)
-- [ ] Implement alarm notifications (email/SMS)
-- [ ] Multi-device support (device registry)
-- [ ] Advanced analytics (trend prediction)
-
----
-
-## 👥 Team
+## 👥 Team & Credits
 
 **Team Omega**  
-Contributors: Arjun Kale, Team Omega Members
+Industrial IoT Monitoring · Hackathon Project · March 2026
+
+### Contributors
+
+- **Arjun (Lead Developer)** — Backend + Frontend Integration, Hardware Bridge
+- **Team Omega** — Full Stack Architecture, Firmware Development
 
 ---
 
 ## 📄 License
 
-MIT License — Open for educational and commercial use.
+MIT License — Feel free to fork, modify, and deploy.
 
 ---
 
-## 🔗 Links
-
-- **GitHub:** https://github.com/rchandrashekar53/Enduraverse-26/
-- **Convex Docs:** https://docs.convex.dev/
-- **Next.js Docs:** https://nextjs.org/docs/
-- **ESP32 Docs:** https://docs.espressif.com/projects/esp-idf/
-
----
-
-**Last Updated:** March 19, 2026  
-**Version:** 1.0.0 (MVP+ Production-Ready)
+**Built with ❤️ by Team Omega**  
+*Turning sensor chaos into thermal clarity.*
