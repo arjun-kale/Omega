@@ -2,7 +2,7 @@
 
 **Team:** Team Omega  
 **Project:** Real-time thermal anomaly detection & visualization for industrial equipment monitoring  
-**Status:** MVP+ Production-Ready · Hackathon Winner-Grade Architecture  
+**Status:** MVP+ Production-Ready ·   
 **Repository:** https://github.com/rchandrashekar53/Enduraverse-26/  
 
 ---
@@ -340,36 +340,3 @@ npm run generate:gear   # Build GLTF fallback model
 ```
 
 ---
-
-## 📝 Git Workflow
-
-```bash
-# View changes
-git status
-
-# Stage & commit
-git add .
-git commit -m "humanized one-liner message"
-
-# Push to branch
-git push origin feature-branch
-
-# Create PR (on GitHub UI to Omega branch)
-```
-
----
-
-## 👥 Team & Credits
-
-**Team Omega**  
-Industrial IoT Monitoring · Hackathon Project · March 2026
-
-### Contributors
-
-- **Arjun (Lead Developer)** — Backend + Frontend Integration, Hardware Bridge
-- **Team Omega** — Full Stack Architecture, Firmware Development
-
----
-
-**Built with ❤️ by Team Omega**  
-*Turning sensor chaos into thermal clarity.*
